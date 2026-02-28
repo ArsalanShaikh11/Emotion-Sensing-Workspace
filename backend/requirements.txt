@@ -1,0 +1,13 @@
+opencv-python
+mediapipe
+websockets
+fastapi
+uvicorn
+pynput
+numpy
+pandas
+tensorflow
+scikit-learn
+pyserial
+python-dotenv
+asyncio

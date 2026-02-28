@@ -1,0 +1,759 @@
+# 🧠 Emotion-Sensing Workspace — Master Development Specification
+
+> **Version:** 1.0 | **Date:** 2026-02-25 | **Author:** Arsalan  
+> **Purpose:** This document is a complete, self-contained specification for building the Emotion-Sensing Workspace system. Any AI agent or developer should be able to implement the full project using only this document with zero additional explanation required.
+
+---
+
+## 1. Problem Statement
+
+### 1.1 The Core Problem
+Modern knowledge workers (students, developers, designers) suffer from invisible cognitive overload. Stress, mental fatigue, and burnout develop gradually and are detected too late — after productivity has already collapsed.
+
+**Key Statistics (for pitch context):**
+- Workplace burnout costs the global economy **$322 billion annually** (Gallup, 2024)
+- **77% of workers** experience burnout at their current job (Deloitte)
+- The average worker loses **2.5 productive hours/day** to unmanaged stress (APA)
+- Current solutions (meditation apps, HR check-ins) are **reactive** — they address burnout after it occurs
+
+### 1.2 The Gap
+No existing system:
+1. Monitors emotional state **continuously and passively** (without user input)
+2. **Predicts** stress escalation before it peaks
+3. **Automatically adapts** the physical environment in real time
+4. Learns and **personalizes** to each individual's unique stress patterns
+
+### 1.3 Our Solution
+**Emotion-Sensing Workspace** is an AI-powered adaptive environment system that:
+- Passively monitors the user's emotional/physiological state using **multi-modal sensing** (face, posture, typing patterns, optional hardware sensors)
+- Runs a **predictive AI model** to forecast stress 10–15 minutes before it peaks
+- Uses a **Reinforcement Learning agent** to learn the user's optimal environment preferences over time
+- Automatically controls the workspace environment (smart lights, ambient music, notification blocking) to intervene proactively
+- Displays real-time analytics on a **beautiful web dashboard**
+
+---
+
+## 2. Project Goals
+
+### 2.1 Primary Goals
+- [G1] Detect the user's stress, focus, and fatigue levels in real time using software-only sensors (webcam + keyboard)
+- [G2] Predict stress escalation 10–15 minutes in advance using time-series ML
+- [G3] Automatically trigger environment interventions (simulated in software, real via Arduino optionally)
+- [G4] Display a live, beautiful dashboard updated every 500ms
+- [G5] Run 100% locally — no cloud, no data leaves the device
+
+### 2.2 Secondary Goals
+- [G6] Personalize interventions using a Reinforcement Learning agent
+- [G7] Show historical productivity analytics (heatmaps, correlation charts)
+- [G8] Support optional Arduino hardware integration as a plug-in replacement
+- [G9] Be demo-ready and impressive for a national-level hackathon audience
+
+### 2.3 Non-Goals (Out of Scope)
+- Mobile app
+- Cloud sync or multi-device support
+- EEG/medical-grade sensing
+- Real Philips Hue integration (optional add-on, not core)
+
+---
+
+## 3. Tech Stack
+
+### 3.1 Backend (Python)
+| Library | Version | Purpose |
+|---|---|---|
+| `python` | 3.11+ | Core runtime |
+| `opencv-python` | latest | Webcam capture, image processing |
+| `mediapipe` | latest | Face mesh, pose/posture landmarks |
+| `websockets` | latest | WebSocket server for real-time comms |
+| `fastapi` | latest | REST API (history, config endpoints) |
+| `uvicorn` | latest | ASGI server for FastAPI |
+| `pynput` | latest | Keyboard event listener (keystroke dynamics) |
+| `numpy` | latest | Numerical processing |
+| `pandas` | latest | Time-series data management |
+| `tensorflow` | 2.x | LSTM prediction model |
+| `scikit-learn` | latest | Data normalization, basic ML utilities |
+| `pyserial` | latest | Arduino serial communication (optional) |
+| `python-dotenv` | latest | Environment config |
+| `asyncio` | stdlib | Async processing loop |
+
+### 3.2 Frontend (React)
+| Library | Version | Purpose |
+|---|---|---|
+| `react` | 18+ | UI framework |
+| `vite` | latest | Build tool / dev server |
+| `recharts` | latest | Live biometric charts |
+| `framer-motion` | latest | UI animations |
+| `zustand` | latest | Global state management |
+| `axios` | latest | REST API calls |
+| `react-router-dom` | latest | Page routing |
+| `lucide-react` | latest | Icons |
+
+---
+
+## 4. System Architecture
+
+### 4.1 High-Level Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        INPUT LAYER                              │
+│  ┌────────────┐  ┌─────────────┐  ┌──────────────┐  ┌───────┐  │
+│  │   Webcam   │  │  Keyboard   │  │  Virtual     │  │ Ardu- │  │
+│  │ (Face+Pose)│  │  Listener   │  │  Sensor Gen  │  │  ino  │  │
+│  └─────┬──────┘  └──────┬──────┘  └──────┬───────┘  └───┬───┘  │
+└────────│────────────────│────────────────│──────────────│───────┘
+         │                │                │              │
+         ▼                ▼                ▼              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SENSOR HUB (sensor_hub.py)                   │
+│         Normalizes all inputs to unified JSON schema            │
+│  Output: { timestamp, heart_rate, gsr, blink_rate,             │
+│            posture_score, keystroke_wpm, keystroke_errors }     │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               EMOTION ENGINE (emotion_engine.py)                │
+│  Combines all signals into 3 normalized scores (0-100):        │
+│    • Stress Score    • Focus Score    • Fatigue Score          │
+└────────────────────┬──────────────────────────────────────────┘
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+┌──────────────────┐   ┌──────────────────────┐
+│ LSTM PREDICTOR   │   │   HISTORY STORE       │
+│ (predictor.py)   │   │   (SQLite / CSV)       │
+│ Forecasts stress │   │   Saves all readings   │
+│ 15 mins ahead    │   │   for analytics        │
+└────────┬─────────┘   └──────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  DECISION BRAIN (decision_brain.py)             │
+│  Rule Engine + RL Agent                                         │
+│  Input: { stress, focus, fatigue, predicted_stress }           │
+│  Output: WorkspaceMode enum (FOCUS | RELAX | BREAK | NORMAL)   │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+                    ┌────────────┴───────────┐
+                    ▼                        ▼
+        ┌──────────────────┐   ┌─────────────────────────┐
+        │ ENVIRONMENT      │   │  WEBSOCKET SERVER        │
+        │ CONTROLLER       │   │  (ws_server.py)          │
+        │ (controller.py)  │   │  Broadcasts JSON frame   │
+        │ Sets lights,     │   │  to React frontend       │
+        │ music, DND mode  │   │  every 500ms             │
+        └──────────────────┘   └───────────┬─────────────┘
+                                            │
+                                            ▼
+                               ┌────────────────────────┐
+                               │   REACT DASHBOARD      │
+                               │   (frontend/)          │
+                               │   Live charts, gauges, │
+                               │   environment panel,   │
+                               │   analytics, history   │
+                               └────────────────────────┘
+```
+
+### 4.2 Data Flow (Step by Step)
+1. **Every 100ms:** `SensorHub` reads from all active input sources and emits a raw reading
+2. **Every 500ms:** `EmotionEngine` aggregates last 5 readings → computes Stress/Focus/Fatigue scores
+3. **Every 500ms:** `LSTMPredictor` runs inference on last 30 readings → emits predicted stress in 15 min
+4. **Every 500ms:** `DecisionBrain` evaluates current + predicted state → selects `WorkspaceMode`
+5. **Every 500ms:** `EnvironmentController` applies mode (logs to console or sends real commands)
+6. **Every 500ms:** `WebSocketServer` broadcasts full JSON frame to all connected React clients
+7. **React client** receives frame → updates Zustand store → charts/gauges re-render
+
+---
+
+## 5. File & Folder Structure
+
+```
+emotion-workspace/
+│
+├── backend/
+│   ├── main.py                          # Entry point. Starts all loops.
+│   ├── config.py                        # All constants and config values
+│   ├── requirements.txt                 # All Python dependencies
+│   │
+│   ├── sensors/
+│   │   ├── __init__.py
+│   │   ├── sensor_hub.py                # Aggregates all sensor inputs
+│   │   ├── virtual_sensor.py            # Simulated data generator
+│   │   ├── face_tracker.py              # Webcam + MediaPipe face/posture
+│   │   ├── keystroke_tracker.py         # pynput keyboard listener
+│   │   └── arduino_sensor.py            # pyserial Arduino reader (optional)
+│   │
+│   ├── ai/
+│   │   ├── __init__.py
+│   │   ├── emotion_engine.py            # Fuses signals → 3 scores
+│   │   ├── predictor.py                 # LSTM stress forecaster
+│   │   └── rl_agent.py                  # Reinforcement learning personalizer
+│   │
+│   ├── brain/
+│   │   ├── __init__.py
+│   │   ├── decision_brain.py            # Mode selection logic
+│   │   └── rules.py                     # Rule definitions (editable table)
+│   │
+│   ├── environment/
+│   │   ├── __init__.py
+│   │   ├── controller.py                # Abstracted environment actuator
+│   │   ├── light_controller.py          # Light commands (sim + real)
+│   │   ├── music_controller.py          # Music playback control
+│   │   └── dnd_controller.py            # System-level DND/focus mode
+│   │
+│   ├── server/
+│   │   ├── __init__.py
+│   │   ├── ws_server.py                 # WebSocket broadcast server
+│   │   └── api_server.py               # FastAPI REST endpoints
+│   │
+│   └── data/
+│       ├── history.csv                  # Raw reading history
+│       ├── models/
+│       │   └── lstm_model.h5            # Trained LSTM weights
+│       └── logs/
+│           └── session.log              # Runtime logs
+│
+├── frontend/
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx                      # Root component + router
+│       ├── store/
+│       │   └── useWorkspaceStore.js     # Zustand global state
+│       ├── hooks/
+│       │   └── useWebSocket.js          # WebSocket connection hook
+│       ├── components/
+│       │   ├── Header.jsx               # Top bar with status indicator
+│       │   ├── StressGauge.jsx          # Circular stress gauge
+│       │   ├── FocusGauge.jsx           # Circular focus gauge
+│       │   ├── FatigueGauge.jsx         # Circular fatigue gauge
+│       │   ├── BiometricChart.jsx       # Live line chart (last 60s)
+│       │   ├── PredictionBanner.jsx     # "Burnout risk in 12 mins" alert
+│       │   ├── EnvironmentPanel.jsx     # Current mode + light/music state
+│       │   ├── ActivityHeatmap.jsx      # Focus level heatmap (day view)
+│       │   └── InsightCard.jsx          # Correlation insight display
+│       └── pages/
+│           ├── Dashboard.jsx            # Main live dashboard
+│           └── Analytics.jsx            # Historical analytics page
+│
+└── README.md
+```
+
+---
+
+## 6. Module Specifications
+
+### 6.1 `sensors/virtual_sensor.py`
+**Purpose:** Generate realistic fake sensor data that mimics real physiological signals. Used when no hardware is connected.
+
+**Key Functions:**
+```python
+class VirtualSensor:
+    def get_reading(self) -> dict:
+        """
+        Returns a JSON-compatible dict every call.
+        Uses sine waves + noise for realism.
+        Periodically injects stress spikes to demo the AI.
+        
+        Returns:
+        {
+            "heart_rate": int,       # range: 60-120 BPM
+            "gsr": float,            # range: 0.0-1.0 (normalized conductance)
+            "source": "virtual"
+        }
+        """
+```
+
+**Implementation Notes:**
+- Heart rate: `72 + 15*sin(t/30) + random(-3,3)`
+- GSR: `0.4 + 0.3*sin(t/45) + random(-0.05,0.05)`
+- Inject spike every ~120 seconds for demo purposes: multiply both by 1.5 for 20s
+
+---
+
+### 6.2 `sensors/face_tracker.py`
+**Purpose:** Use the webcam to detect emotion and fatigue signals.
+
+**Key Signals Extracted:**
+| Signal | Method | Output |
+|---|---|---|
+| Blink rate | MediaPipe face mesh, EAR (Eye Aspect Ratio) | blinks per minute |
+| Head tilt | Nose tip vs midpoint vector | degrees |
+| Mouth open | Lip distance landmarks | boolean |
+| Gaze direction | Iris landmark position | (x, y) normalized |
+| Posture | MediaPipe Pose, shoulder tilt | posture_score 0-100 |
+
+**Key Functions:**
+```python
+class FaceTracker:
+    def __init__(self): 
+        # Initialize MediaPipe FaceMesh + Pose
+        
+    def get_reading(self) -> dict:
+        """
+        Returns:
+        {
+            "blink_rate": float,       # blinks/min, high = fatigue
+            "eye_openness": float,     # 0-1, low = fatigue
+            "posture_score": float,    # 0-100, low = slouching
+            "head_tilt": float,        # degrees from vertical
+            "face_detected": bool,
+            "source": "camera"
+        }
+        """
+```
+
+---
+
+### 6.3 `sensors/keystroke_tracker.py`
+**Purpose:** Passively monitor typing patterns to infer stress level.
+
+**Key Metrics:**
+| Metric | Stress Indicator |
+|---|---|
+| WPM (words per minute) | Sudden drop → distraction/fatigue |
+| Error rate | High backspace rate → stressed |
+| Key hold duration | Long holds → hesitation |
+| Inter-key interval variance | High variance → erratic = stressed |
+
+```python
+class KeystrokeTracker:
+    def get_reading(self) -> dict:
+        """
+        Returns:
+        {
+            "wpm": float,                    # current typing speed
+            "error_rate": float,             # backspace / total keys ratio
+            "inter_key_variance": float,     # variance in ms between keys
+            "keystroke_stress_score": float, # 0-100 derived score
+            "source": "keyboard"
+        }
+        """
+```
+
+---
+
+### 6.4 `sensors/sensor_hub.py`
+**Purpose:** Single point of truth. Aggregates all sensor sources into one unified reading.
+
+```python
+class SensorHub:
+    def __init__(self, mode="virtual"):
+        # mode = "virtual" | "camera" | "full" | "arduino"
+        # Initialize appropriate sensor objects based on mode
+        
+    def get_unified_reading(self) -> dict:
+        """
+        Calls all active sensors and merges results.
+        
+        Returns unified schema:
+        {
+            "timestamp": float,           # Unix timestamp
+            "heart_rate": float,          # BPM
+            "gsr": float,                 # 0-1
+            "blink_rate": float,          # per minute
+            "eye_openness": float,        # 0-1
+            "posture_score": float,       # 0-100
+            "wpm": float,
+            "error_rate": float,
+            "keystroke_stress_score": float,
+            "active_sources": list[str]   # e.g. ["virtual","camera","keyboard"]
+        }
+        """
+```
+
+---
+
+### 6.5 `ai/emotion_engine.py`
+**Purpose:** Fuse all sensor signals into 3 clean, normalized scores.
+
+**Scoring Logic:**
+
+**Stress Score (0–100):**
+```
+stress = (
+    normalize(gsr) * 0.35 +
+    normalize(100 - heart_rate_resting_delta) * 0.25 +
+    keystroke_stress_score * 0.25 +
+    normalize(100 - posture_score) * 0.15
+) * 100
+```
+
+**Focus Score (0–100):**
+```
+focus = (
+    normalize(wpm) * 0.40 +
+    normalize(eye_openness) * 0.30 +
+    normalize(100 - error_rate * 100) * 0.30
+) * 100
+```
+
+**Fatigue Score (0–100):**
+```
+fatigue = (
+    normalize(blink_rate) * 0.50 +
+    normalize(100 - eye_openness) * 0.30 +
+    normalize(100 - posture_score) * 0.20
+) * 100
+```
+
+```python
+class EmotionEngine:
+    def compute(self, reading: dict) -> dict:
+        """
+        Returns:
+        {
+            "stress": float,    # 0-100
+            "focus": float,     # 0-100
+            "fatigue": float,   # 0-100
+            "timestamp": float
+        }
+        """
+```
+
+---
+
+### 6.6 `ai/predictor.py`
+**Purpose:** LSTM model that predicts stress level 15 minutes into the future based on historical readings.
+
+**Model Architecture:**
+```
+Input:  (30, 3)   ← last 30 timesteps × [stress, focus, fatigue]
+LSTM:   64 units, return_sequences=True
+LSTM:   32 units
+Dense:  16 units, relu
+Dense:  1 unit    → predicted_stress (0-100)
+```
+
+**Training:** Self-supervised on the user's own session data. Begins collecting data from Day 1, starts making predictions after 100 readings (~50 minutes).
+
+```python
+class StressPredictor:
+    def predict(self, history: list[dict]) -> float:
+        """
+        Takes last 30 emotion readings.
+        Returns: predicted_stress (float, 0-100) in 15 minutes.
+        Returns None if insufficient data.
+        """
+```
+
+---
+
+### 6.7 `brain/rules.py`
+**Purpose:** Editable rule table that maps emotional states to workspace modes.
+
+```python
+RULES = [
+    {
+        "name": "Critical Stress",
+        "condition": lambda s, f, fa: s > 80 and f < 30,
+        "mode": "RELAX",
+        "priority": 1
+    },
+    {
+        "name": "High Fatigue",
+        "condition": lambda s, f, fa: fa > 75,
+        "mode": "BREAK",
+        "priority": 2
+    },
+    {
+        "name": "Deep Focus",
+        "condition": lambda s, f, fa: s < 30 and f > 70,
+        "mode": "FOCUS",
+        "priority": 3
+    },
+    {
+        "name": "Predictive Burnout",
+        "condition": lambda s, f, fa: predicted_stress > 80,
+        "mode": "RELAX",
+        "priority": 1   # highest priority
+    },
+    {
+        "name": "Default",
+        "condition": lambda s, f, fa: True,
+        "mode": "NORMAL",
+        "priority": 99
+    }
+]
+```
+
+---
+
+### 6.8 `brain/decision_brain.py`
+**Purpose:** Evaluate rules and select the active workspace mode.
+
+```python
+class DecisionBrain:
+    def decide(self, emotion: dict, predicted_stress: float) -> str:
+        """
+        Evaluates all rules in priority order.
+        Returns: mode string — "FOCUS" | "RELAX" | "BREAK" | "NORMAL"
+        """
+```
+
+---
+
+### 6.9 `environment/controller.py`
+**Purpose:** Abstract actuator. Applies the selected workspace mode to all environment systems.
+
+**Mode Definitions:**
+| Mode | Lights | Music | System |
+|---|---|---|---|
+| `FOCUS` | Cool blue (#4FC3F7), bright | Lo-fi instrumental | DND on |
+| `RELAX` | Warm amber (#FFB347), dim | Ambient/nature sounds | DND off |
+| `BREAK` | Soft green (#81C784), medium | Upbeat | All notifications on |
+| `NORMAL` | Neutral white (#F5F5F0), medium | None | Normal |
+
+```python
+class EnvironmentController:
+    def apply_mode(self, mode: str):
+        """
+        In simulation: logs to console + updates a shared state dict.
+        With Arduino: sends serial commands.
+        With Philips Hue: sends HTTP PUT to Hue bridge (optional).
+        """
+```
+
+---
+
+### 6.10 `server/ws_server.py`
+**Purpose:** Broadcasts the full system state to all connected React clients every 500ms.
+
+**Broadcast JSON Schema (sent to frontend every 500ms):**
+```json
+{
+  "timestamp": 1740000000.0,
+  "emotion": {
+    "stress": 72.3,
+    "focus": 45.1,
+    "fatigue": 38.7
+  },
+  "prediction": {
+    "stress_in_15min": 88.2,
+    "alert": true,
+    "alert_message": "Burnout risk detected in ~12 minutes"
+  },
+  "mode": "RELAX",
+  "environment": {
+    "light_color": "#FFB347",
+    "light_brightness": 40,
+    "music": "ambient",
+    "dnd": false
+  },
+  "sensors": {
+    "heart_rate": 94,
+    "gsr": 0.71,
+    "blink_rate": 22,
+    "wpm": 38,
+    "posture_score": 55,
+    "active_sources": ["camera", "keyboard", "virtual"]
+  }
+}
+```
+
+---
+
+### 6.11 `server/api_server.py` (FastAPI)
+**REST Endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/history` | Returns last N readings as JSON array |
+| `GET` | `/api/stats/today` | Returns today's summary (avg stress, peak times) |
+| `GET` | `/api/stats/week` | Returns 7-day aggregated stats |
+| `GET` | `/api/config` | Returns current system config |
+| `POST` | `/api/config` | Update config (mode, thresholds) |
+
+---
+
+## 7. Frontend Specification
+
+### 7.1 Pages
+| Route | Component | Description |
+|---|---|---|
+| `/` | `Dashboard.jsx` | Live real-time view |
+| `/analytics` | `Analytics.jsx` | Historical data, heatmaps |
+
+### 7.2 Dashboard Layout
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  HEADER: "Emotion Workspace" | Mode: RELAX | ● Live            │
+├───────────────────────────────────────────────────────────────-─┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  STRESS      │  │  FOCUS       │  │  FATIGUE     │          │
+│  │  Gauge: 72   │  │  Gauge: 45   │  │  Gauge: 38   │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+├─────────────────────────────────────────────────────────────────┤
+│  ⚠️ PREDICTION BANNER: "Burnout risk in ~12 minutes"            │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────┐  ┌─────────────────────────┐   │
+│  │  BIOMETRIC CHART           │  │  ENVIRONMENT PANEL      │   │
+│  │  (Live line chart 60s)     │  │  💡 Light: Warm Amber   │   │
+│  │  Stress / Focus / Fatigue  │  │  🎵 Music: Ambient      │   │
+│  │                            │  │  🔕 DND: OFF            │   │
+│  └────────────────────────────┘  └─────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────┐  ┌─────────────────────────┐   │
+│  │  ACTIVITY HEATMAP          │  │  INSIGHT CARD           │   │
+│  │  (Today's focus levels)    │  │  "You're 40% more       │   │
+│  │                            │  │   focused before 12pm"  │   │
+│  └────────────────────────────┘  └─────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.3 Design System
+```css
+/* Color Palette */
+--bg-primary: #0A0E1A;       /* Deep navy background */
+--bg-card: #111827;           /* Card background */
+--bg-accent: #1F2937;         /* Slight elevation */
+--text-primary: #F9FAFB;
+--text-secondary: #9CA3AF;
+
+--stress-low: #10B981;        /* Green */
+--stress-mid: #F59E0B;        /* Amber */
+--stress-high: #EF4444;       /* Red */
+
+--mode-focus: #4FC3F7;        /* Blue */
+--mode-relax: #FFB347;        /* Warm amber */
+--mode-break: #81C784;        /* Green */
+--mode-normal: #F5F5F0;       /* White */
+
+/* Typography */
+font-family: 'Inter', sans-serif;
+```
+
+### 7.4 `useWebSocket.js` Hook
+```javascript
+// Connects to ws://localhost:8765
+// On each message: parses JSON → dispatches to Zustand store
+// Auto-reconnects on disconnect (max 5 retries, 2s backoff)
+```
+
+### 7.5 Zustand Store Shape (`useWorkspaceStore.js`)
+```javascript
+{
+  emotion: { stress: 0, focus: 0, fatigue: 0 },
+  prediction: { stress_in_15min: 0, alert: false, alert_message: "" },
+  mode: "NORMAL",
+  environment: { light_color: "#F5F5F0", music: "none", dnd: false },
+  sensors: { heart_rate: 72, gsr: 0.4, ... },
+  history: [],          // last 120 readings for charts
+  connectionStatus: "connecting" | "connected" | "disconnected"
+}
+```
+
+---
+
+## 8. 10-Day Development Schedule
+
+| Day | Focus | Deliverables |
+|---|---|---|
+| **1** | Project setup + Virtual Sensors + WebSocket server | `main.py`, `virtual_sensor.py`, `sensor_hub.py`, `ws_server.py` running |
+| **2** | React Dashboard foundation + live chart | Dashboard renders with live updating charts from WS |
+| **3** | Face detection + Posture tracking | `face_tracker.py` producing readings from webcam |
+| **4** | Keystroke dynamics | `keystroke_tracker.py` producing `wpm`, `error_rate` |
+| **5** | Emotion Engine + Decision Brain + Rules | `emotion_engine.py`, `rules.py`, `decision_brain.py` wired up |
+| **6** | LSTM Predictor + Prediction Banner on UI | `predictor.py` trained on session data, banner shows on dashboard |
+| **7** | Environment Controller + animated mode transitions | `controller.py`, EnvironmentPanel.jsx with smooth transitions |
+| **8** | Analytics page + heatmap + insights | `Analytics.jsx`, FastAPI history endpoints |
+| **9** | UI polish + performance + bug fixes | Final UI, all components smooth, no lag |
+| **10** | Demo rehearsal + pitch prep + optional Arduino | Arduino plug-in tested if hardware available |
+
+---
+
+## 9. Setup & Installation Instructions
+
+### 9.1 Backend Setup
+```bash
+cd emotion-workspace/backend
+python -m venv venv
+venv\Scripts\activate          # Windows
+pip install -r requirements.txt
+python main.py
+```
+
+### 9.2 Frontend Setup
+```bash
+cd emotion-workspace/frontend
+npm install
+npm run dev
+# Opens at http://localhost:5173
+```
+
+### 9.3 Running Both (Parallel)
+- Terminal 1: `python backend/main.py`   → WebSocket on `ws://localhost:8765`, REST on `http://localhost:8000`
+- Terminal 2: `npm run dev` in `frontend/`  → UI on `http://localhost:5173`
+
+### 9.4 Switching from Virtual to Real Sensors
+Edit `backend/config.py`:
+```python
+SENSOR_MODE = "virtual"   # Change to "camera", "arduino", or "full"
+ARDUINO_PORT = "COM3"     # Windows. Use "/dev/ttyUSB0" on Linux.
+ARDUINO_BAUD = 9600
+```
+
+---
+
+## 10. Arduino Integration (Optional Add-On)
+
+### 10.1 Arduino Wiring
+| Sensor | Arduino Pin |
+|---|---|
+| GSR Sensor (data) | A0 |
+| Heart Rate (Pulse Sensor) | A1 |
+| RGB LED Strip (R) | D3 (PWM) |
+| RGB LED Strip (G) | D5 (PWM) |
+| RGB LED Strip (B) | D6 (PWM) |
+
+### 10.2 Arduino Sketch Behavior
+- Every 500ms: reads A0 (GSR) + A1 (heart pulse) → formats as JSON → sends over Serial
+- Listens on Serial for incoming RGB command: `"LED:255,183,71\n"` → sets LED color
+
+### 10.3 Python Arduino Reader (`arduino_sensor.py`)
+```python
+class ArduinoSensor:
+    def get_reading(self) -> dict:
+        # Reads one line from serial port
+        # Parses JSON: {"gsr": 650, "heart_rate": 88}
+        # Returns in unified schema
+        
+    def set_led(self, r: int, g: int, b: int):
+        # Sends "LED:r,g,b\n" to Arduino
+```
+
+---
+
+## 11. Key Design Decisions & Rationale
+
+| Decision | Rationale |
+|---|---|
+| **Virtual sensors first** | Allows full development without hardware dependency. Hardware is a drop-in swap. |
+| **Python for backend** | Best ecosystem for AI/ML (MediaPipe, TensorFlow) + easy serial I/O |
+| **WebSockets over REST for live data** | 500ms polling via REST would be noisy; WS is persistent and low-latency |
+| **LSTM for prediction** | Time-series data with temporal dependencies is best handled by LSTM |
+| **Zustand over Redux** | Simpler boilerplate, sufficient for this app's state complexity |
+| **Recharts over D3** | React-native, simpler API, sufficient for the chart types needed |
+| **100% local, no cloud** | Privacy-first is a key differentiator; no data ever leaves the device |
+| **Rule engine + RL** | Rules handle known states deterministically; RL handles personalization over time |
+
+---
+
+## 12. Demo Script (For Hackathon Judges)
+
+1. Open dashboard → show live breathing heart rate graph (virtual sensor)
+2. Start typing fast and making errors → show stress gauge rise in real time (keystroke tracker)
+3. Slouch in chair → show fatigue gauge respond (posture detection)
+4. Stress crosses threshold → **"RELAX MODE ACTIVATED"** banner appears, light panel turns amber
+5. Prediction banner appears: **"⚠️ Burnout risk in ~12 minutes"**
+6. Switch to Analytics page → show heatmap + "You're 40% more focused before 12pm" insight
+7. If Arduino present: physical LED strip changes color live when modes switch
+
+**Talking Point:** *"Unlike every other productivity tool, we don't ask you to self-report. We observe, predict, and act — before you even feel the stress."*
+
+---
+
+*End of Specification — This document is self-contained. Proceed directly to implementation.*
