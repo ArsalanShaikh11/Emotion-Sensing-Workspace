@@ -80,4 +80,4 @@ Our system acts like a silent assistant that constantly optimizes your environme
 
 ## 🏗️ High-Level System Architecture
 
-![High-Level System Architecture](High-Level-System-Architecture.png)
+![High-Level System Architecture](High-Level-System-Architecture.jpg)
