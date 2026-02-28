@@ -72,3 +72,12 @@ Modern work causes:
 
 Our system acts like a silent assistant that constantly optimizes your environment without interrupting your workflow.
 
+---
+
+## 🖼️ Emotion Sensing Workspace Flow
+
+![Emotion Sensing Workspace Flow](Emotion-Sensing-Workspace-Flow.jpeg)
+
+## 🏗️ High-Level System Architecture
+
+![High-Level System Architecture](High-Level-System-Architecture.png)
